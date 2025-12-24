@@ -8,12 +8,12 @@ import 'product_detail_screen.dart';
 class HomeScreen extends StatefulWidget {
   final String role;
   final Function(dynamic)? onAddToCart;
-  final String searchQuery;  // ADD: Search query parameter
+  final String searchQuery;
   const HomeScreen({
     super.key, 
     required this.role, 
     this.onAddToCart,
-    this.searchQuery = '',  // Default empty string
+    this.searchQuery = '',
   });
 
   @override
@@ -25,14 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> products = [];
   bool _isLoading = true;
 
-  // Sesuaikan URL agar konsisten dengan file lain
-  String get baseUrl => kIsWeb
-      ? 'http://localhost:3000/api/products'
-      : 'http://10.0.2.2:3000/api/products';
-  
-  String get storageUrl => kIsWeb 
-      ? 'http://localhost:3000/uploads' 
-      : 'http://10.0.2.2:3000/uploads';
+String get baseUrl => 'https://retail-buah-v2-7mu3ahd3h-anantapramudyaalfarits-projects.vercel.app/api';
+String get storageUrl => 'https://retail-buah-v2-7mu3ahd3h-anantapramudyaalfarits-projects.vercel.app/uploads';
 
   @override
   void initState() {
@@ -40,7 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchProducts();
   }
 
-  // ADD: Filter products based on search query
   List<dynamic> _filteredProducts() {
     if (widget.searchQuery.isEmpty) {
       return products;
@@ -54,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchProducts() async {
     try {
-      final response = await dio.get(baseUrl);
+      final response = await dio.get('$baseUrl/products');
       setState(() {
         products = response.data ?? [];
         _isLoading = false;
@@ -169,7 +162,6 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         border: Border.all(color: Theme.of(context).dividerColor),
         borderRadius: BorderRadius.circular(4),
-        // QR Code sebaiknya tetap di background putih agar mudah discan
         color: Colors.white, 
       ),
       child: QrImageView(
@@ -177,7 +169,6 @@ class _HomeScreenState extends State<HomeScreen> {
         version: QrVersions.auto,
         size: 70,
         gapless: false,
-        // Pastikan warna QR Code kontras (hitam) karena background putih
         eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
         dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Colors.black),
         errorStateBuilder: (ctx, err) {
@@ -193,7 +184,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      // Mengikuti tema latar belakang scaffold
       backgroundColor: theme.scaffoldBackgroundColor, 
       appBar: AppBar(
         backgroundColor: theme.appBarTheme.backgroundColor,
@@ -249,7 +239,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: Column(
                       children: [
-                        // Table Header
                         Container(
                           color: const Color(0xFF00BCD4),
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
@@ -264,14 +253,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                         ),
-                        // Table Rows
                         ListView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: _filteredProducts().length,
                           itemBuilder: (context, index) {
                             final product = _filteredProducts()[index];
-                            // Row color adaptif
                             final rowColor = index % 2 == 0 
                                 ? (isDark ? Colors.grey[900] : Colors.grey[50])
                                 : (isDark ? theme.scaffoldBackgroundColor : Colors.white);
@@ -297,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: Row(
                                         children: [
                                           _buildCellText('${index + 1}', width: 40),
-                                          _buildImageCell(product['gambar']),
+                                          _buildImageCell(product['image_url']),
                                           Expanded(child: _buildCellText(product['nama'] ?? '-', textAlign: TextAlign.left, isBold: true)),
                                           _buildCellText('${product['stok'] ?? 0}', width: 70, color: const Color(0xFF00BCD4)),
                                           _buildQRCell(product),
@@ -318,8 +305,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
     );
   }
-
-  // --- Helper Widgets agar kode lebih bersih ---
 
   Widget _buildHeaderText(String text, {double? width, TextAlign textAlign = TextAlign.center}) {
     return SizedBox(
@@ -349,7 +334,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildImageCell(String? imageName) {
+  // PERBAIKAN DI SINI: Mendukung URL image_url (sudah full URL)
+  Widget _buildImageCell(String? imageUrl) {
     return SizedBox(
       width: 70,
       child: Center(
@@ -359,23 +345,20 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(6),
             color: Colors.grey[300],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: imageName != null && imageName.isNotEmpty
-                ? Image.network(
-                    '$storageUrl/$imageName',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported),
-                  )
-                : const Icon(Icons.shopping_bag, color: Colors.grey),
-          ),
+          child: (imageUrl != null && imageUrl.isNotEmpty)
+              ? Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.grey, size: 28),
+                )
+              : const Icon(Icons.image, color: Colors.grey, size: 28),
         ),
       ),
     );
   }
 
   Widget _buildQRCell(dynamic product) {
-    final qrData = _generateQRCode(product['_id'] ?? '', product['nama'] ?? 'Produk');
+    final qrData = _generateQRCode(product['id'] ?? '', product['nama'] ?? 'Produk');
     return SizedBox(
       width: 80,
       child: Tooltip(
@@ -406,7 +389,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showLowStockNotification() {
     final lowStockProducts = products.where((p) => (p['stok'] ?? 0) < 5).toList();
-    
     if (lowStockProducts.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(context).showSnackBar(

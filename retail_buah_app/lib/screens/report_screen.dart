@@ -37,8 +37,8 @@ class _ReportScreenState extends State<ReportScreen> {
       body: ListView.builder(
         itemCount: logs.length,
         itemBuilder: (ctx, i) => ListTile(
-          title: Text(logs[i]['namaBuah']),
-          subtitle: Text("Terjual: ${logs[i]['jumlah']} | Total: Rp ${logs[i]['totalHarga']}"),
+          title: Text(logs[i]['product_name'] ?? 'Unknown'),
+          subtitle: Text("Terjual: ${logs[i]['quantity'] ?? 0} | Total: Rp ${logs[i]['total_price'] ?? 0}"),
           trailing: Text(logs[i]['tanggal'].toString().substring(0, 10)),
         ),
       ),

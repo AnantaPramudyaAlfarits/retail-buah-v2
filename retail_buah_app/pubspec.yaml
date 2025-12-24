@@ -15,6 +15,9 @@ dependencies:
   # Library untuk koneksi ke API Express.js
   dio: ^5.4.0
 
+  # Supabase untuk database access langsung
+  supabase_flutter: ^2.3.0
+
   # Untuk memformat mata uang (Rp) dan tanggal
   intl: ^0.19.0
 

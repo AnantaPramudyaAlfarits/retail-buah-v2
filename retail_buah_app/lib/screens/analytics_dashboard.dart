@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 
 class AnalyticsDashboard extends StatefulWidget {
   final List<dynamic> transactions;
@@ -16,266 +17,108 @@ class AnalyticsDashboard extends StatefulWidget {
 }
 
 class _AnalyticsDashboardState extends State<AnalyticsDashboard> {
+  // Helper untuk memformat angka Rupiah
+  String formatIDR(dynamic amount) {
+    return NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0)
+        .format(amount);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Hitung total penjualan
+    // Perhitungan Data
     final totalSales = widget.transactions.fold<int>(
-      0,
-      (sum, item) => sum + (item['totalHarga'] as int? ?? 0),
+      0, (sum, item) => sum + (item['total_price'] as int? ?? 0),
     );
 
-    // Hitung transaksi hari ini
     final today = DateTime.now();
-    final todaySales = widget.transactions
-        .where((item) {
-          final date = DateTime.tryParse(item['tanggal'].toString());
-          return date != null &&
-              date.year == today.year &&
-              date.month == today.month &&
-              date.day == today.day;
-        })
-        .fold<int>(0, (sum, item) => sum + (item['totalHarga'] as int? ?? 0));
+    final todaySales = widget.transactions.where((item) {
+      final date = DateTime.tryParse(item['tanggal'].toString());
+      return date != null && date.year == today.year && date.month == today.month && date.day == today.day;
+    }).fold<int>(0, (sum, item) => sum + (item['total_price'] as int? ?? 0));
 
-    // Produk terlaris
     final bestSelling = _getBestSellingProduct();
-
-    // Data 7 hari terakhir
     final chartData = _getLast7DaysData();
 
     return ListView(
       padding: const EdgeInsets.all(16),
+      physics: const BouncingScrollPhysics(),
       children: [
-        // Summary Cards
+        // Section: Overview
+        Text(
+          "Ringkasan Performa",
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
+          childAspectRatio: 1.4,
           children: [
             _buildSummaryCard(
               title: 'Total Penjualan',
-              value: 'Rp $totalSales',
-              icon: Icons.trending_up,
-              color: Colors.green,
-              isDark: isDark,
+              value: formatIDR(totalSales),
+              icon: Icons.payments_outlined,
+              color: Colors.teal,
               theme: theme,
             ),
             _buildSummaryCard(
-              title: 'Penjualan Hari Ini',
-              value: 'Rp $todaySales',
-              icon: Icons.calendar_today,
-              color: Colors.blue,
-              isDark: isDark,
+              title: 'Hari Ini',
+              value: formatIDR(todaySales),
+              icon: Icons.today_outlined,
+              color: Colors.blueAccent,
               theme: theme,
             ),
             _buildSummaryCard(
               title: 'Total Produk',
               value: '${widget.products.length}',
-              icon: Icons.inventory,
+              icon: Icons.inventory_2_outlined,
               color: Colors.orange,
-              isDark: isDark,
               theme: theme,
             ),
             _buildSummaryCard(
-              title: 'Transaksi',
+              title: 'Total Transaksi',
               value: '${widget.transactions.length}',
-              icon: Icons.receipt,
-              color: Colors.purple,
-              isDark: isDark,
+              icon: Icons.receipt_long_outlined,
+              color: Colors.purpleAccent,
               theme: theme,
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        
+        const SizedBox(height: 28),
 
-        // Produk Terlaris
-        Text(
-          'Produk Terlaris',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        // Section: Chart
+        _buildSectionHeader(theme, "Tren Penjualan (7 Hari Terakhir)", Icons.insights),
         const SizedBox(height: 12),
-        if (bestSelling != null)
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: theme.dividerColor),
-              color: isDark ? Colors.grey[900] : Colors.grey[50],
-            ),
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF00BCD4), Color(0xFFE91E63)],
-                    ),
-                  ),
-                  child: const Icon(Icons.star, color: Colors.white, size: 30),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        bestSelling['namaBuah'] ?? 'Produk',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Terjual: ${bestSelling['totalJumlah']} kg',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  'Rp ${bestSelling['totalPenjualan']}',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFF00BCD4),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          Text(
-            'Belum ada transaksi',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: Colors.grey[600],
-            ),
-          ),
-        const SizedBox(height: 24),
+        _buildChartContainer(theme, isDark, chartData),
 
-        // Chart 7 Hari Terakhir
-        Text(
-          'Tren Penjualan (7 Hari Terakhir)',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        const SizedBox(height: 28),
+
+        // Section: Best Selling
+        _buildSectionHeader(theme, "Produk Terlaris", Icons.star_outline_rounded),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: theme.dividerColor),
-            color: isDark ? Colors.grey[900] : Colors.grey[50],
-          ),
-          padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            height: 300,
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: true,
-                  horizontalInterval: 500000,
-                  verticalInterval: 1,
-                  getDrawingHorizontalLine: (value) {
-                    return FlLine(
-                      color: theme.dividerColor,
-                      strokeWidth: 1,
-                    );
-                  },
-                  getDrawingVerticalLine: (value) {
-                    return FlLine(
-                      color: theme.dividerColor,
-                      strokeWidth: 1,
-                    );
-                  },
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        const titles = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-                        if (value.toInt() < titles.length) {
-                          return Text(
-                            titles[value.toInt()],
-                            style: const TextStyle(fontSize: 10),
-                          );
-                        }
-                        return const Text('');
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        return Text(
-                          'Rp ${(value / 1000000).toStringAsFixed(1)}M',
-                          style: const TextStyle(fontSize: 10),
-                        );
-                      },
-                      reservedSize: 50,
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(
-                  show: true,
-                  border: Border.all(color: theme.dividerColor),
-                ),
-                minX: 0,
-                maxX: 6,
-                minY: 0,
-                maxY: _getMaxYValue(chartData),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: chartData,
-                    isCurved: true,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF00BCD4), Color(0xFFE91E63)],
-                    ),
-                    barWidth: 3,
-                    isStrokeCapRound: true,
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, percent, barData, index) =>
-                          FlDotCirclePainter(
-                        radius: 5,
-                        color: const Color(0xFF00BCD4),
-                        strokeWidth: 2,
-                        strokeColor: Colors.white,
-                      ),
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF00BCD4).withOpacity(0.3),
-                          const Color(0xFFE91E63).withOpacity(0.0),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        _buildBestSellingCard(theme, isDark, bestSelling),
+        
+        const SizedBox(height: 40), // Spacer bawah
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(ThemeData theme, String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF00BCD4)),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -286,106 +129,215 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard> {
     required String value,
     required IconData icon,
     required Color color,
-    required bool isDark,
     required ThemeData theme,
   }) {
     return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.dividerColor),
-        color: isDark ? Colors.grey[900] : Colors.grey[50],
-      ),
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: theme.dividerColor.withOpacity(0.05)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                title,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[600],
+                value,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color.withOpacity(0.2),
-                ),
-                padding: const EdgeInsets.all(8),
-                child: Icon(icon, color: color, size: 20),
+              Text(
+                title,
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
   }
 
-  dynamic _getBestSellingProduct() {
-    final salesByProduct = <String, Map<String, dynamic>>{};
+  Widget _buildChartContainer(ThemeData theme, bool isDark, List<FlSpot> data) {
+    return Container(
+      height: 280,
+      padding: const EdgeInsets.fromLTRB(10, 24, 24, 10),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+      ),
+      child: LineChart(
+        LineChartData(
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: theme.dividerColor.withOpacity(0.1),
+              strokeWidth: 1,
+            ),
+          ),
+          titlesData: FlTitlesData(
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                interval: 1,
+                getTitlesWidget: (value, meta) {
+                  final days = _getLast7DaysNames();
+                  if (value.toInt() >= 0 && value.toInt() < days.length) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(days[value.toInt()], style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                    );
+                  }
+                  return const SizedBox();
+                },
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 45,
+                getTitlesWidget: (value, meta) {
+                  if (value == meta.max) return const SizedBox();
+                  return Text(
+                    value >= 1000000 ? '${(value / 1000000).toStringAsFixed(1)}M' : '${(value / 1000).toInt()}k',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  );
+                },
+              ),
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          lineBarsData: [
+            LineChartBarData(
+              spots: data,
+              isCurved: true,
+              curveSmoothness: 0.35,
+              gradient: const LinearGradient(colors: [Color(0xFF00BCD4), Color(0xFFE91E63)]),
+              barWidth: 4,
+              isStrokeCapRound: true,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0xFF00BCD4).withOpacity(0.2),
+                    const Color(0xFF00BCD4).withOpacity(0),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    for (var item in widget.transactions) {
-      final name = item['namaBuah'] ?? 'Unknown';
-      if (!salesByProduct.containsKey(name)) {
-        salesByProduct[name] = {
-          'namaBuah': name,
-          'totalJumlah': 0,
-          'totalPenjualan': 0,
-        };
-      }
-      salesByProduct[name]!['totalJumlah'] += item['jumlah'] as int? ?? 0;
-      salesByProduct[name]!['totalPenjualan'] += item['totalHarga'] as int? ?? 0;
-    }
+  Widget _buildBestSellingCard(ThemeData theme, bool isDark, dynamic bestSelling) {
+    if (bestSelling == null) return const Center(child: Text("Data tidak tersedia"));
 
-    if (salesByProduct.isEmpty) return null;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Color(0xFF00BCD4), Color(0xFFE91E63)]),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.auto_awesome, color: Colors.white),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(bestSelling['product_name'], style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text("Volume penjualan: ${bestSelling['totalQuantity']} kg", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(formatIDR(bestSelling['totalRevenue']), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00BCD4))),
+              const Text("Omset", style: TextStyle(fontSize: 10, color: Colors.grey)),
+            ],
+          )
+        ],
+      ),
+    );
+  }
 
-    var best = salesByProduct.values.first;
-    for (var product in salesByProduct.values) {
-      if ((product['totalJumlah'] as int) > (best['totalJumlah'] as int)) {
-        best = product;
-      }
-    }
-    return best;
+  // --- Logic Functions ---
+
+  List<String> _getLast7DaysNames() {
+    return List.generate(7, (i) {
+      final date = DateTime.now().subtract(Duration(days: 6 - i));
+      return DateFormat('EEE').format(date);
+    });
   }
 
   List<FlSpot> _getLast7DaysData() {
     final now = DateTime.now();
-    final last7Days = <FlSpot>[];
-
-    for (int i = 6; i >= 0; i--) {
-      final date = now.subtract(Duration(days: i));
-      final salesOnDate = widget.transactions
-          .where((item) {
-            final txDate = DateTime.tryParse(item['tanggal'].toString());
-            return txDate != null &&
-                txDate.year == date.year &&
-                txDate.month == date.month &&
-                txDate.day == date.day;
-          })
-          .fold<int>(0, (sum, item) => sum + (item['totalHarga'] as int? ?? 0));
-
-      last7Days.add(FlSpot((6 - i).toDouble(), salesOnDate.toDouble()));
-    }
-
-    return last7Days;
+    return List.generate(7, (i) {
+      final date = now.subtract(Duration(days: 6 - i));
+      final sales = widget.transactions.where((tx) {
+        final d = DateTime.tryParse(tx['tanggal'].toString());
+        return d != null && d.year == date.year && d.month == date.month && d.day == date.day;
+      }).fold<int>(0, (sum, item) => sum + (item['total_price'] as int? ?? 0));
+      return FlSpot(i.toDouble(), sales.toDouble());
+    });
   }
 
-  double _getMaxYValue(List<FlSpot> data) {
-    if (data.isEmpty) return 1000000;
-    final max = data.map((e) => e.y).reduce((a, b) => a > b ? a : b);
-    return (max * 1.2).toInt().toDouble();
+  dynamic _getBestSellingProduct() {
+    if (widget.transactions.isEmpty) return null;
+    final map = <String, Map<String, dynamic>>{};
+    for (var tx in widget.transactions) {
+      final name = tx['product_name'] ?? 'Unknown';
+      map.update(name, (val) => {
+        'product_name': name,
+        'totalQuantity': val['totalQuantity'] + (tx['quantity'] ?? 0),
+        'totalRevenue': val['totalRevenue'] + (tx['total_price'] ?? 0),
+      }, ifAbsent: () => {
+        'product_name': name,
+        'totalQuantity': tx['quantity'] ?? 0,
+        'totalRevenue': tx['total_price'] ?? 0,
+      });
+    }
+    return map.values.reduce((a, b) => a['totalQuantity'] > b['totalQuantity'] ? a : b);
   }
 }

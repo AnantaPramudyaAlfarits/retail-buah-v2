@@ -19,8 +19,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   int _selectedIndex = 0;
   final dio = Dio();
 
-  String get baseUrl => kIsWeb ? 'http://localhost:3000/api' : 'http://10.0.2.2:3000/api';
-  String get storageUrl => kIsWeb ? 'http://localhost:3000/uploads' : 'http://10.0.2.2:3000/uploads';
+String get baseUrl => 'https://retail-buah-v2-7mu3ahd3h-anantapramudyaalfarits-projects.vercel.app/api';
+  String get storageUrl => 'https://retail-buah-v2-7mu3ahd3h-anantapramudyaalfarits-projects.vercel.app/uploads';
 
   @override
   Widget build(BuildContext context) {
@@ -106,8 +106,8 @@ class _ProductsTabState extends State<_ProductsTab> {
     final nameC = TextEditingController(text: product?['nama'] ?? '');
     final priceC = TextEditingController(text: product?['harga']?.toString() ?? '');
     final stockC = TextEditingController(text: product?['stok']?.toString() ?? '');
+    final imageUrlC = TextEditingController(text: product?['image_url'] ?? '');
     final isEdit = product != null;
-    _imageFile = null;
 
     showDialog(
       context: context,
@@ -118,24 +118,27 @@ class _ProductsTabState extends State<_ProductsTab> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                GestureDetector(
-                  onTap: () async {
-                    final img = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 40);
-                    if (img != null) setST(() => _imageFile = img);
-                  },
-                  child: Container(
-                    height: 120, width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[500]!),
-                    ),
-                    child: _imageFile != null
-                        ? (kIsWeb ? Image.network(_imageFile!.path, fit: BoxFit.cover) : Image.file(File(_imageFile!.path), fit: BoxFit.cover))
-                        : (isEdit && product['gambar'] != null && product['gambar'] != '')
-                            ? Image.network('${widget.storageUrl}/${product['gambar']}', fit: BoxFit.cover)
-                            : const Icon(Icons.add_a_photo, size: 40, color: Colors.grey),
+                // Preview gambar dari URL
+                Container(
+                  height: 120, width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[500]!),
                   ),
+                  child: imageUrlC.text.isNotEmpty
+                      ? Image.network(imageUrlC.text, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.grey))
+                      : const Icon(Icons.image, size: 40, color: Colors.grey),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: imageUrlC,
+                  decoration: const InputDecoration(
+                    labelText: 'Image URL',
+                    hintText: 'https://example.com/image.jpg',
+                    prefixIcon: Icon(Icons.link),
+                  ),
+                  onChanged: (_) => setST(() {}),
                 ),
                 TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Nama Produk')),
                 TextField(controller: priceC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Harga')),
@@ -147,15 +150,26 @@ class _ProductsTabState extends State<_ProductsTab> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
             ElevatedButton(
               onPressed: () async {
-                FormData data = FormData.fromMap({'nama': nameC.text, 'harga': priceC.text, 'stok': stockC.text});
-                if (_imageFile != null) {
-                  data.files.add(MapEntry('image', kIsWeb 
-                    ? MultipartFile.fromBytes(await _imageFile!.readAsBytes(), filename: _imageFile!.name)
-                    : await MultipartFile.fromFile(_imageFile!.path, filename: _imageFile!.name)));
+                final data = {
+                  'nama': nameC.text,
+                  'harga': priceC.text,
+                  'stok': stockC.text,
+                  'image_url': imageUrlC.text,
+                };
+                
+                try {
+                  if (isEdit) {
+                    await widget.dio.put('${widget.baseUrl}/products/${product['id']}', data: data);
+                  } else {
+                    await widget.dio.post('${widget.baseUrl}/products', data: data);
+                  }
+                  Navigator.pop(ctx);
+                  _fetchProducts();
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: ${e.toString()}')),
+                  );
                 }
-                isEdit ? await widget.dio.put('${widget.baseUrl}/products/${product['_id']}', data: data)
-                       : await widget.dio.post('${widget.baseUrl}/products', data: data);
-                Navigator.pop(ctx); _fetchProducts();
               },
               child: const Text('Simpan'),
             )
@@ -184,7 +198,7 @@ class _ProductsTabState extends State<_ProductsTab> {
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   child: ListTile(
-                    leading: Container(width: 50, height: 50, color: Colors.grey[300], child: p['gambar'] != '' ? Image.network('${widget.storageUrl}/${p['gambar']}', fit: BoxFit.cover) : const Icon(Icons.image)),
+                    leading: Container(width: 50, height: 50, color: Colors.grey[300], child: p['image_url'] != null && p['image_url'] != '' ? Image.network(p['image_url'], fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)) : const Icon(Icons.image)),
                     title: Text(p['nama'], style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text('Rp ${p['harga']} | Stok: ${p['stok']}'),
                     trailing: Row(
@@ -192,7 +206,7 @@ class _ProductsTabState extends State<_ProductsTab> {
                       children: [
                         IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _showProductDialog(product: p)),
                         IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async {
-                           await widget.dio.delete('${widget.baseUrl}/products/${p['_id']}'); _fetchProducts();
+                           await widget.dio.delete('${widget.baseUrl}/products/${p['id']}'); _fetchProducts();
                         }),
                       ],
                     ),
@@ -309,7 +323,7 @@ class _StaffTabState extends State<_StaffTab> {
                   if (passwordC.text.isNotEmpty) {
                     updateData['password'] = passwordC.text;
                   }
-                  await widget.dio.put('${widget.baseUrl}/users/${user['_id']}', data: updateData);
+                  await widget.dio.put('${widget.baseUrl}/users/${user['id']}', data: updateData);
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('✅ Staff berhasil diperbarui')),
@@ -429,7 +443,7 @@ class _StaffTabState extends State<_StaffTab> {
                                 );
                                 if (confirm == true) {
                                   try {
-                                    await widget.dio.delete('${widget.baseUrl}/users/${user['_id']}');
+                                    await widget.dio.delete('${widget.baseUrl}/users/${user['id']}');
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(content: Text('✅ Staff berhasil dihapus')),
                                     );

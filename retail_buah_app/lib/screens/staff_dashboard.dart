@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'home_screen.dart';
 import 'login.dart';
+import '../main.dart'; // Import untuk fungsi ganti tema
 import '../widgets/theme_toggle_button.dart';
 
 class StaffDashboard extends StatefulWidget {
@@ -17,9 +18,10 @@ class _StaffDashboardState extends State<StaffDashboard> {
   final dio = Dio();
   List<dynamic> cartItems = [];
   List<dynamic> transactionHistory = [];
-  String searchQuery = '';  // ADD: Search query state
+  String searchQuery = ''; 
 
-  String get baseUrl => kIsWeb ? 'http://localhost:3000/api' : 'http://10.0.2.2:3000/api';
+String get baseUrl => 'https://retail-buah-v2-7mu3ahd3h-anantapramudyaalfarits-projects.vercel.app/api';
+String get storageUrl => 'https://retail-buah-v2-7mu3ahd3h-anantapramudyaalfarits-projects.vercel.app/uploads';
 
   @override
   void initState() {
@@ -41,7 +43,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
   }
 
   void _addToCart(dynamic product) {
-    final existingItemIndex = cartItems.indexWhere((item) => item['_id'] == product['_id']);
+    final existingItemIndex = cartItems.indexWhere((item) => item['id'] == product['id']);
     final quantity = product['quantity'] ?? 1;
 
     setState(() {
@@ -66,33 +68,55 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
     try {
       for (var item in cartItems) {
-        // 1. Buat transaksi
-        await dio.post('$baseUrl/transactions', data: {
-          'namaBuah': item['nama'],
-          'jumlah': item['quantity'],
-          'totalHarga': (item['harga'] ?? 0) * item['quantity'],
-        });
+        print('💳 Processing item: ${item['nama']} (ID: ${item['id']})');
+        
+        // 1. Buat transaksi dengan detail produk lengkap
+        try {
+          final transactionResponse = await dio.post('$baseUrl/transactions', data: {
+            'product_id': item['id'],
+            'product_name': item['nama'],
+            'quantity': item['quantity'],
+            'price': item['harga'],
+            'total_price': (item['harga'] ?? 0) * item['quantity'],
+          });
+          print('✅ Transaction created: ${transactionResponse.data}');
+        } catch (e) {
+          print('❌ Transaction error: $e');
+          throw Exception('Gagal membuat transaksi untuk ${item['nama']}: $e');
+        }
 
         // 2. Kurangi stok
         try {
-          await dio.post(
-            '$baseUrl/products/${item['_id']}/reduce-stock',
+          print('📉 Reducing stock for product ${item['id']} by ${item['quantity']}');
+          final stockResponse = await dio.put(
+            '$baseUrl/products/${item['id']}/reduce-stock',
             data: {'quantity': item['quantity'] ?? 1},
           );
+          print('✅ Stock reduced: ${stockResponse.data}');
         } catch (e) {
-          print('Gagal update stok: $e');
+          print('❌ Stock reduction error: $e');
+          throw Exception('Gagal mengurangi stok untuk ${item['nama']}: $e');
         }
       }
 
       setState(() => cartItems.clear());
-      _fetchTransactionHistory();
+      await _fetchTransactionHistory();
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Transaksi Berhasil!'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('✅ Transaksi Berhasil! Stok telah diperbarui.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
       );
     } catch (e) {
+      print('❌ Checkout error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Gagal: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('❌ Gagal: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
       );
     }
   }
@@ -113,7 +137,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
         centerTitle: true,
         title: Text(
           'Staff Dashboard',
-          style: theme.textTheme.headlineSmall?.copyWith(
+          style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
             color: isDark ? Colors.white : Colors.black87,
           ),
@@ -128,7 +152,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
           },
         ),
         actions: const [
-          ThemeToggleButton(),
+          ThemeToggleButton(), // Tombol ganti tema global
         ],
       ),
       body: IndexedStack(
@@ -155,11 +179,11 @@ class _StaffDashboardState extends State<StaffDashboard> {
   Widget _buildPenjualanTab(bool isDark, ThemeData theme) {
     return Row(
       children: [
+        // Bagian Kiri: List Produk + Search
         Expanded(
           flex: 2,
           child: Column(
             children: [
-              // Search Bar
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: TextField(
@@ -170,23 +194,22 @@ class _StaffDashboardState extends State<StaffDashboard> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     filled: true,
                     fillColor: isDark ? const Color(0xFF2A2A2A) : Colors.grey[100],
                   ),
                 ),
               ),
-              // Product List with Search Filter
               Expanded(
                 child: HomeScreen(
                   role: 'staff',
                   onAddToCart: _addToCart,
-                  searchQuery: searchQuery,  // Pass search query
+                  searchQuery: searchQuery, // Kirim parameter search
                 ),
               ),
             ],
           ),
         ),
+        // Bagian Kanan: Keranjang Belanja
         Expanded(
           flex: 1,
           child: Container(
@@ -231,6 +254,21 @@ class _StaffDashboardState extends State<StaffDashboard> {
                               color: isDark ? Colors.grey[850] : Colors.grey[100],
                               child: ListTile(
                                 dense: true,
+                                leading: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(4),
+                                    color: Colors.grey[300],
+                                  ),
+                                  child: (item['image_url'] != null && item['image_url'].toString().isNotEmpty)
+                                      ? Image.network(
+                                          item['image_url'],
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(Icons.image, size: 18),
+                                        )
+                                      : const Icon(Icons.image, size: 18),
+                                ),
                                 title: Text(item['nama'],
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                 subtitle: Text('x${item['quantity']} - Rp ${item['harga'] * item['quantity']}',
@@ -256,7 +294,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
                         children: [
                           const Text('Total'),
                           Text(
-                            'Rp ${cartItems.fold<int>(0, (sum, item) => sum + ((item['harga'] as int) * (item['quantity'] as int)))}',
+                            'Rp ${cartItems.fold<int>(0, (sum, item) => sum + (((item['harga'] ?? 0) as int) * ((item['quantity'] ?? 1) as int)))}',
                             style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00BCD4)),
                           ),
                         ],
@@ -269,8 +307,9 @@ class _StaffDashboardState extends State<StaffDashboard> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF00BCD4),
                             disabledBackgroundColor: Colors.grey,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                          child: const Text('BAYAR', style: TextStyle(color: Colors.white)),
+                          child: const Text('BAYAR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
@@ -294,10 +333,26 @@ class _StaffDashboardState extends State<StaffDashboard> {
               final trx = transactionHistory[index];
               return Card(
                 child: ListTile(
-                  leading: const Icon(Icons.receipt_long, color: Color(0xFF00BCD4)),
-                  title: Text(trx['namaBuah'] ?? 'Produk', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(trx['tanggal']?.toString().substring(0, 10) ?? ''),
-                  trailing: Text('Rp ${trx['totalHarga']}',
+                  leading: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      color: Colors.grey[300],
+                    ),
+                    child: (trx['image_url'] != null && trx['image_url'].toString().isNotEmpty)
+                        ? Image.network(
+                            trx['image_url'],
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 24),
+                          )
+                        : const Icon(Icons.image, size: 24),
+                  ),
+                  title: Text(trx['product_name'] ?? 'Produk', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(
+                    '${trx['tanggal']?.toString().substring(0, 10) ?? ''} | x${trx['quantity']}',
+                  ),
+                  trailing: Text('Rp ${trx['total_price']}',
                       style: const TextStyle(color: Color(0xFFE91E63), fontWeight: FontWeight.bold)),
                 ),
               );

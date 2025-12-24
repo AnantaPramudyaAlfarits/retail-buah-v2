@@ -16,6 +16,9 @@ class ProductDetailScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    // Ambil image_url langsung dari database
+    final String? imageUrl = product['image_url'];
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: theme.appBarTheme.backgroundColor,
@@ -26,7 +29,7 @@ class ProductDetailScreen extends StatelessWidget {
         ),
         title: Text(
           'Detail Produk',
-          style: theme.textTheme.headlineSmall?.copyWith(
+          style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -50,9 +53,9 @@ class ProductDetailScreen extends StatelessWidget {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: product['gambar'] != null && product['gambar'] != ''
+                child: imageUrl != null && imageUrl.isNotEmpty
                     ? Image.network(
-                        '$storageUrl/${product['gambar']}',
+                        imageUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
                             Icon(Icons.image_not_supported, size: 80, color: Colors.grey[400]),
@@ -177,7 +180,7 @@ class ProductDetailScreen extends StatelessWidget {
                 children: [
                   _buildInfoRow('Nama', product['nama'] ?? '-', theme),
                   const SizedBox(height: 8),
-                  _buildInfoRow('ID Produk', product['_id'] ?? '-', theme),
+                  _buildInfoRow('ID Produk', product['id'] ?? '-', theme),
                   const SizedBox(height: 8),
                   _buildInfoRow('Unit', product['unit'] ?? 'kg', theme),
                   const SizedBox(height: 8),
@@ -195,6 +198,7 @@ class ProductDetailScreen extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00BCD4),
                   padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 child: const Text(
                   'Kembali',

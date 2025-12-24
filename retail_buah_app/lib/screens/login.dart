@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
+import '../main.dart';
 import 'admin_dashboard.dart';
 import 'staff_dashboard.dart';
 import 'register.dart';
-import '../widgets/theme_toggle_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,16 +17,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  final dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-    ),
-  );
 
-  String get baseUrl => kIsWeb
-      ? 'http://localhost:3000/api/auth'
-      : 'http://10.0.2.2:3000/api/auth';
+  String get baseUrl => 'https://retail-buah-v2-7mu3ahd3h-anantapramudyaalfarits-projects.vercel.app/api';
 
   Future<void> _handleLogin() async {
     if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
@@ -38,7 +29,11 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      print('🔐 Trying login with: ${_usernameController.text}');
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ));
+      
       final response = await dio.post(
         '$baseUrl/login',
         data: {
@@ -47,16 +42,9 @@ class _LoginScreenState extends State<LoginScreen> {
         },
       );
 
-      print('📡 Response: ${response.data}');
-      
       final role = response.data['role'] ?? 'staff';
-      print('👤 Role detected: $role');
-      
-      // Delay sebelum navigate
-      await Future.delayed(const Duration(milliseconds: 500));
       
       if (mounted) {
-        print('🚀 Navigating to ${role == 'admin' ? 'AdminDashboard' : 'StaffDashboard'}');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -67,20 +55,13 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on DioException catch (e) {
-      print('❌ DioException: ${e.message}');
-      print('📍 Status Code: ${e.response?.statusCode}');
-      print('💬 Response: ${e.response?.data}');
-      
       if (e.response?.statusCode == 401) {
         _showSnackBar('❌ Username atau password salah!');
-      } else if (e.type == DioExceptionType.connectionTimeout) {
-        _showSnackBar('❌ Timeout - Server tidak merespon');
       } else {
         _showSnackBar('❌ Gagal login: ${e.message}');
       }
     } catch (e) {
-      print('🔥 Exception: $e');
-      _showSnackBar('❌ Login gagal! Periksa koneksi Anda.');
+      _showSnackBar('❌ Error: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -88,10 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
@@ -104,63 +82,74 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
+      // backgroundColor otomatis mengikuti tema (scaffoldBackgroundColor)
       appBar: AppBar(
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: const [
-          ThemeToggleButton(),
+        actions: [
+          // TOMBOL SWITCH TEMA DI LOGIN
+          IconButton(
+            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, 
+                color: isDark ? Colors.white : Colors.black87),
+            onPressed: () {
+              final newMode = isDark ? ThemeMode.light : ThemeMode.dark;
+              MyApp.of(context)?.changeTheme(newMode);
+            },
+          ),
         ],
       ),
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Header Title
+                const SizedBox(height: 20),
+                // Header Title - Mengikuti tema teks
                 Text(
                   'Fruit Store Management',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     fontSize: 32,
+                    color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 40),
+                
                 // Username Field
                 TextField(
                   controller: _usernameController,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                   decoration: InputDecoration(
                     labelText: 'Username',
-                    hintText: 'Type your username',
                     prefixIcon: const Icon(Icons.person_outline),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
+                    labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    // Border warna adaptif
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
+                      borderSide: BorderSide(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.blue, width: 2),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   enabled: !_isLoading,
                 ),
                 const SizedBox(height: 20),
+
                 // Password Field
                 TextField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                   decoration: InputDecoration(
                     labelText: 'Password',
-                    hintText: 'Type your password',
                     prefixIcon: const Icon(Icons.lock_outline),
+                    labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -169,44 +158,23 @@ class _LoginScreenState extends State<LoginScreen> {
                         setState(() => _obscurePassword = !_obscurePassword);
                       },
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
+                      borderSide: BorderSide(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.blue, width: 2),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   enabled: !_isLoading,
                 ),
-                const SizedBox(height: 12),
-                // Forgot Password Link
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: _isLoading ? null : () {},
-                    child: Text(
-                      'Forgot password?',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
+                
+                const SizedBox(height: 40),
+
                 // Login Button dengan Gradient
                 Container(
+                  width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFF00BCD4), Color(0xFFE91E63)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
                     ),
                     borderRadius: BorderRadius.circular(30),
                   ),
@@ -218,56 +186,39 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
+                            ? const Center(
+                                child: SizedBox(
+                                  height: 20, width: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                 ),
                               )
-                            : Center(
-                                child: Text(
-                                  'LOGIN',
-                                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
+                            : const Text(
+                                'LOGIN',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                               ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
-                // Sign Up Button
+                const SizedBox(height: 24),
+                
+                // Sign Up Button - Outline adaptif
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const RegisterScreen(),
-                              ),
-                            );
-                          },
+                    onPressed: _isLoading ? null : () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen()));
+                    },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: BorderSide(color: Colors.grey[300]!),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      side: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: Text(
                       'SIGN UP',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Colors.black87,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
